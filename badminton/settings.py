@@ -25,7 +25,7 @@ SECRET_KEY = "django-insecure-xiq-l@ysy2&jy-s@c53yi6+@1nv@+(_(&vyqwqydd9sgt&s**7
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['10.126.197.37', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['10.126.197.37', 'localhost', '127.0.0.1', '192.168.0.98']
 
 
 
@@ -78,9 +78,13 @@ WSGI_APPLICATION = "badminton.wsgi.application"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'db93b4g3m7j3ns',
+        'USER': 'gjfbyrhqywdtis',
+        'PASSWORD': 'fd919c103af50787b4f68dac60f9c4a36c26f7d424df05fb573e19a19ce92bfb',
+        'HOST': 'ec2-54-155-46-64.eu-west-1.compute.amazonaws.com',
+        'PORT': '5432',
     }
 }
 
