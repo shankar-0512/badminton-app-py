@@ -31,14 +31,14 @@ def login(request):
             else:
                 response_data = {
                     "responseCode": 1,
-                    "responseMessage": "Invalid Username or Password",
+                    "responseMessage": "Invalid Nickname or Password",
                 }
 
             return JsonResponse(response_data, safe=False)
 
     except Exception as e:
         print("Error:", e)
-        return JsonResponse({"responseCode": 1, "responseMessage": "Login Error"})
+        return JsonResponse({"responseCode": 2, "responseMessage": "Login Error"})
 
 
 @csrf_exempt
@@ -50,7 +50,7 @@ def signup(request):
             password = data.get('password')
 
             if game.objects.filter(user_name=username).exists():
-                return JsonResponse({"responseCode": 1, "responseMessage": "Username already exists"})
+                return JsonResponse({"responseCode": 1, "responseMessage": "Nickname already exists"})
 
             hashed_password = make_password(password)
 
@@ -67,11 +67,11 @@ def signup(request):
             }
             return JsonResponse(response_data, safe=False)
         else:
-            return JsonResponse({"responseCode": 1, "responseMessage": "Method not allowed"}, status=405)
+            return JsonResponse({"responseCode": 2, "responseMessage": "Method not allowed"}, status=405)
 
     except Exception as e:
         print("Error:", e)
-        return JsonResponse({"responseCode": 1, "responseMessage": "Signup Error"})
+        return JsonResponse({"responseCode": 3, "responseMessage": "Signup Error"})
 
 
 @csrf_exempt
@@ -349,7 +349,7 @@ def reset_database(request):
         for player in all_players:
             player.elo_rating = 1500  # Assuming default ELO rating is 1500
             player.playing = 'N'
-            player.status = "active"
+            player.status = "inactive"
             player.played = 0
             player.won = 0
             player.lost = 0
