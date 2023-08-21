@@ -19,8 +19,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-STATIC_URL = '/static/'
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -159,6 +157,11 @@ CHANNEL_LAYERS = {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
             "hosts": [('rediss://:pe0fa47f847713f19c6268c887bde5e448ff9d9911ddf996f6d2a0979c0ad5893@ec2-63-32-201-87.eu-west-1.compute.amazonaws.com:11150')],
+            "ssl": {
+                "cert_reqs": "CERT_REQUIRED",
+                "ssl_version": "PROTOCOL_TLSv1_2",
+                "ca_certs": "/etc/ssl/certs/ca-certificates.crt"  # Path to CA certs on Heroku
+            },
         },
     },
 }
