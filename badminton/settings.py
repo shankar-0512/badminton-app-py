@@ -152,21 +152,20 @@ CORS_ALLOW_CREDENTIALS = True
 # CORS_PREFLIGHT_MAX_AGE = ...  # Max age of preflight requests cache
 # CORS_ALLOW_ALL_ORIGINS = True   # Allow all origins (not recommended for production)
 
-
-import redis
-from urllib.parse import urlparse
-
-redis_url = urlparse("rediss://:pe0fa47f847713f19c6268c887bde5e448ff9d9911ddf996f6d2a0979c0ad5893@ec2-63-32-201-87.eu-west-1.compute.amazonaws.com:11150")
-redis_conn = redis.Redis(host=redis_url.hostname, port=redis_url.port, password=redis_url.password, ssl=True, ssl_cert_reqs='required', ssl_ca_certs='/etc/ssl/certs/ca-certificates.crt')
-
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [(redis_conn,)],
+            "hosts": [(
+                'ec2-63-32-201-87.eu-west-1.compute.amazonaws.com', 
+                11150
+            )],
+            'password': 'pe0fa47f847713f19c6268c887bde5e448ff9d9911ddf996f6d2a0979c0ad5893',
+            'ssl': True,
         },
     },
 }
+
 
 
 
