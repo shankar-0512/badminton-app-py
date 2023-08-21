@@ -4,4 +4,6 @@ sqlparse==0.4.4
 typing_extensions==4.7.1
 django-cors-headers==3.10.0
 channels
+psycopg2>=2.8,<3.0
+
 
