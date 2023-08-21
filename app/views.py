@@ -8,6 +8,12 @@ from .models import court
 from datetime import datetime
 from django.db.models import F
 from django.contrib.auth.hashers import make_password, check_password
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+channel_layer = get_channel_layer()
 
 
 @csrf_exempt
@@ -87,6 +93,19 @@ def fetch_active_players(request):
             "responseMessage": "Active players fetched successfully.",
             "activePlayersCount": active_players_count,  # Include the count in the response
         }
+
+        # Send WebSocket message
+        async_to_sync(channel_layer.group_send)(
+            'updates_group',
+            {
+                'type': 'send_update',
+                'message': {
+                    'updateType': 'active_players',
+                    # This can be the updated list of active players or a count
+                    'data': active_players_count
+                }
+            })
+
         return JsonResponse(response_data, safe=False)
 
     except Exception as e:
@@ -144,8 +163,7 @@ def remove_from_pool(request):
         return JsonResponse(response_data)
 
 
-@csrf_exempt
-def generate_pairing(request):
+def generate_pairing():
     try:
         # Fetch all players with the "active" status and "playing" status as "N"
         available_players = game.objects.filter(status="active", playing="N")
@@ -225,12 +243,31 @@ def generate_pairing(request):
             "firstAvailableCourt": first_available_court_key
         }
 
-        return JsonResponse(response_data, safe=False)
+        # Send WebSocket message
+        async_to_sync(channel_layer.group_send)(
+            'updates_group',
+            {
+                'type': 'send_update',
+                'message': {
+                    'updateType': 'court_status',
+                    'data': court_status
+                }
+            })
+
+        # Send WebSocket message
+        async_to_sync(channel_layer.group_send)(
+            'updates_group',
+            {
+                'type': 'send_update',
+                'message': {
+                    'updateType': 'teams',
+                    'data': response_data
+                }
+            })
 
     except Exception as e:
         # Handle any exceptions that may occur during pairing generation
         print("Error:", e)
-        return JsonResponse({"responseCode": 2, "responseMessage": "Error occurred during pairing generation."})
 
 
 def select_player(available_players):
@@ -402,3 +439,33 @@ def fetch_court_status():
         }
 
     return court_status
+
+
+@csrf_exempt
+def navigate_to_court_screen(request):
+    try:
+        # Send WebSocket message
+        async_to_sync(channel_layer.group_send)(
+            'updates_group',
+            {
+                'type': 'send_update',
+                'message': {
+                    'updateType': 'navigateBack',
+                    'data': ""
+                }
+            })
+        
+        return JsonResponse({"responseCode": 0, "responseMessage": "Navigation Success"})
+
+    except Exception as e:
+        # Handle any exceptions that may occur during fetching active players
+        print("Error:", e)
+        return JsonResponse({"responseCode": 1, "responseMessage": "Navigation Error"})
+
+
+@receiver(post_save, sender=game)
+def player_joined(sender, instance, **kwargs):
+    # Check the count of active players
+    active_players = game.objects.filter(status="active").count()
+    if active_players >= 4:
+        generate_pairing()

@@ -39,7 +39,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "app",
-    "corsheaders"
+    "corsheaders",
+    "channels"
 ]
 
 MIDDLEWARE = [
@@ -71,7 +72,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "badminton.wsgi.application"
+ASGI_APPLICATION = 'badminton.routing.application'
 
 
 # Database
@@ -146,3 +147,15 @@ CORS_ALLOW_CREDENTIALS = True
 # CORS_EXPOSE_HEADERS = [...]  # List of exposed headers
 # CORS_PREFLIGHT_MAX_AGE = ...  # Max age of preflight requests cache
 # CORS_ALLOW_ALL_ORIGINS = True   # Allow all origins (not recommended for production)
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}
+
+
+

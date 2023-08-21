@@ -2,7 +2,7 @@ from django.db import models
 
 
 class game(models.Model):
-    user_name = models.TextField()
+    user_name = models.TextField(unique=True)
     status = models.TextField(default="inactive")
     elo_rating = models.IntegerField(default=1500)
     uncertainty = models.FloatField(default=1)
@@ -32,3 +32,12 @@ class court(models.Model):
     class Meta:
         managed = False  # Tell Django not to manage this table with migrations
         db_table = 'court_status'
+
+class active_pool(models.Model):
+    user_name = models.TextField(unique=True)
+    status = models.TextField()
+    playing = models.CharField()
+
+    class Meta:
+        managed = False  # Tell Django not to manage this table with migrations
+        db_table = 'active_pool'

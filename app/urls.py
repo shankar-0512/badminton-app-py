@@ -12,4 +12,5 @@ urlpatterns = [
     path('updateElo/', views.update_elo, name='updateElo'),
     path('resetDatabase/', views.reset_database, name='resetDatabase'),
     path('getCourtStatus/', views.get_court_status, name='getCourtStatus'),
+    path('navigateToCourtScreen/', views.navigate_to_court_screen, name='navigateToCourtScreen'),
 ]
