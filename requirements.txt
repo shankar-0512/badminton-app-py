@@ -7,6 +7,7 @@ channels
 psycopg2>=2.8,<3.0
 daphne
 channels-redis>=3.2,<4
+redis
 
 
 
