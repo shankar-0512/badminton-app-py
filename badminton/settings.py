@@ -152,14 +152,22 @@ CORS_ALLOW_CREDENTIALS = True
 # CORS_PREFLIGHT_MAX_AGE = ...  # Max age of preflight requests cache
 # CORS_ALLOW_ALL_ORIGINS = True   # Allow all origins (not recommended for production)
 
+import ssl
+new_context = ssl.SSLContext() # this sets the verify_mode to 'CERT_NONE'
+host = [{
+        'address': f'rediss://ec2-63-32-201-87.eu-west-1.compute.amazonaws.com:11150', # don't miss the 'rediss'!
+        'password': 'pe0fa47f847713f19c6268c887bde5e448ff9d9911ddf996f6d2a0979c0ad5893',
+        'ssl': new_context ,
+    }]
+
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [('rediss://:pe0fa47f847713f19c6268c887bde5e448ff9d9911ddf996f6d2a0979c0ad5893@ec2-63-32-201-87.eu-west-1.compute.amazonaws.com:11150')],
+            "hosts": host,
+            "symmetric_encryption_keys": [SECRET_KEY],
         },
-    },
-}
+    }}
 
 
 
