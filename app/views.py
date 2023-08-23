@@ -3,96 +3,154 @@ from django.views.decorators.csrf import csrf_exempt
 import math
 import json
 import random
+from django.db import models
 from .models import game
 from .models import court
 from datetime import datetime
+from datetime import date
 from django.db.models import F
 from django.contrib.auth.hashers import make_password, check_password
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+import logging
+from .models import history
 
 channel_layer = get_channel_layer()
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 
 @csrf_exempt
 def login(request):
+    """
+    Handles user login.
+    """
+    if request.method != 'POST':
+        return JsonResponse({
+            "responseCode": 3,
+            "responseMessage": "Method not allowed"
+        }, status=405)  # HTTP 405 Method Not Allowed
+
     try:
-        if request.method == 'POST':
-            data = json.loads(request.body)
-            username = data.get('userName')
-            password = data.get('password')
+        data = json.loads(request.body)
+        username = data.get('userName')
+        password = data.get('password')
 
-            user = game.objects.filter(user_name=username).first()
+        if not username or not password:
+            return JsonResponse({
+                "responseCode": 4,
+                "responseMessage": "Username and password are required"
+            }, status=400)  # HTTP 400 Bad Request
 
-            print(password, user.password)
+        user = game.objects.filter(user_name=username).first()
 
-            if user and check_password(password, user.password):
-                response_data = {
-                    "responseCode": 0,
-                    "responseMessage": "Login Successful",
-                    "userName": username
-                }
-            else:
-                response_data = {
-                    "responseCode": 1,
-                    "responseMessage": "Invalid Nickname or Password",
-                }
+        if user and check_password(password, user.password):
+            logger.info(f"Successful login attempt for {username}")
+            return JsonResponse({
+                "responseCode": 0,
+                "responseMessage": "Login successful",
+                "userName": username
+            })
 
-            return JsonResponse(response_data, safe=False)
+        logger.warning(f"Invalid login attempt for {username}")
+        return JsonResponse({
+            "responseCode": 1,
+            "responseMessage": "Invalid username or password"
+        }, status=401)  # HTTP 401 Unauthorized
+
+    except json.JSONDecodeError:
+        logger.error("Failed to decode JSON request body")
+        return JsonResponse({
+            "responseCode": 5,
+            "responseMessage": "Malformed request"
+        }, status=400)  # HTTP 400 Bad Request
 
     except Exception as e:
-        print("Error:", e)
-        return JsonResponse({"responseCode": 2, "responseMessage": "Login Error"})
+        logger.error(f"Login error: {e}")
+        return JsonResponse({
+            "responseCode": 2,
+            "responseMessage": "Internal server error"
+        }, status=500)  # HTTP 500 Internal Server Error
 
 
 @csrf_exempt
 def signup(request):
+    """
+    Handles user signup.
+    """
+    if request.method != 'POST':
+        return JsonResponse({
+            "responseCode": 2,
+            "responseMessage": "Method not allowed"
+        }, status=405)  # HTTP 405 Method Not Allowed
+
     try:
-        if request.method == 'POST':
-            data = json.loads(request.body)
-            username = data.get('userName')
-            password = data.get('password')
+        data = json.loads(request.body)
+        username = data.get('userName')
+        password = data.get('password')
 
-            if game.objects.filter(user_name=username).exists():
-                return JsonResponse({"responseCode": 1, "responseMessage": "Nickname already exists"})
+        if not username or not password:
+            return JsonResponse({
+                "responseCode": 4,
+                "responseMessage": "Username and password are required"
+            }, status=400)  # HTTP 400 Bad Request
 
-            hashed_password = make_password(password)
+        if game.objects.filter(user_name=username).exists():
+            logger.warning(f"Signup attempt with existing username: {username}")
+            return JsonResponse({
+                "responseCode": 1,
+                "responseMessage": "Nickname already exists"
+            }, status=409)  # HTTP 409 Conflict
 
-            new_user = game(
-                user_name=username,
-                password=hashed_password,
-                # You can add any additional fields here that are required for the new user
-            )
-            new_user.save()
+        hashed_password = make_password(password)
 
-            response_data = {
-                "responseCode": 0,
-                "responseMessage": "Signup Successful",
-            }
-            return JsonResponse(response_data, safe=False)
-        else:
-            return JsonResponse({"responseCode": 2, "responseMessage": "Method not allowed"}, status=405)
+        new_user = game(
+            user_name=username,
+            password=hashed_password,
+            # You can add any additional fields here that are required for the new user
+        )
+        new_user.save()
+
+        logger.info(f"New user signup: {username}")
+        return JsonResponse({
+            "responseCode": 0,
+            "responseMessage": "Signup successful"
+        })
+
+    except json.JSONDecodeError:
+        logger.error("Failed to decode JSON request body during signup")
+        return JsonResponse({
+            "responseCode": 5,
+            "responseMessage": "Malformed request"
+        }, status=400)  # HTTP 400 Bad Request
 
     except Exception as e:
-        print("Error:", e)
-        return JsonResponse({"responseCode": 3, "responseMessage": "Signup Error"})
+        logger.error(f"Signup error: {e}")
+        return JsonResponse({
+            "responseCode": 3,
+            "responseMessage": "Internal server error"
+        }, status=500)  # HTTP 500 Internal Server Error
 
 
 @csrf_exempt
 def fetch_active_players(request):
+    """
+    Fetch active players.
+    """
+    if request.method != 'GET':
+        return JsonResponse({
+            "responseCode": 3,
+            "responseMessage": "Method not allowed"
+        }, status=405)  # HTTP 405 Method Not Allowed
+
     try:
         # Fetch all players with the "active" status and "playing" status as "N"
         available_players = game.objects.filter(status="active", playing="N")
         # Get the count of active players
         active_players_count = available_players.count()
-
-        response_data = {
-            "responseCode": 0,
-            "responseMessage": "Active players fetched successfully.",
-            "activePlayersCount": active_players_count,  # Include the count in the response
-        }
 
         # Send WebSocket message
         async_to_sync(channel_layer.group_send)(
@@ -104,111 +162,199 @@ def fetch_active_players(request):
                     # This can be the updated list of active players or a count
                     'data': active_players_count
                 }
-            })
+            }
+        )
 
-        return JsonResponse(response_data, safe=False)
+        logger.info("Active players fetched successfully.")
+        return JsonResponse({
+            "responseCode": 0,
+            "responseMessage": "Active players fetched successfully.",
+            "activePlayersCount": active_players_count  # Include the count in the response
+        })
 
     except Exception as e:
-        # Handle any exceptions that may occur during fetching active players
-        print("Error:", e)
-        return JsonResponse({"responseCode": 2, "responseMessage": "Error occurred during fetching active players."})
+        logger.error(f"Error occurred during fetching active players: {e}")
+        return JsonResponse({
+            "responseCode": 2,
+            "responseMessage": "Error occurred during fetching active players."
+        }, status=500)  # HTTP 500 Internal Server Error
 
 
 @csrf_exempt
 def add_to_pool(request):
-    if request.method == 'POST':
-        try:
+    """
+    Adds a user to the pool.
+    """
+    if request.method != 'POST':
+        return JsonResponse({
+            "responseCode": 3,
+            "responseMessage": "Method not allowed"
+        }, status=405)  # HTTP 405 Method Not Allowed
 
-            data = json.loads(request.body)
-            user_name = data.get('userName')
+    try:
+        data = json.loads(request.body)
+        user_name = data.get('userName')
 
-            user = game.objects.get(user_name=user_name)
+        if not user_name:
+            return JsonResponse({
+                "responseCode": 4,
+                "responseMessage": "Username is required"
+            }, status=400)  # HTTP 400 Bad Request
 
-            # Update the status to "active"
-            user.status = "active"
-            user.save()
+        user = game.objects.get(user_name=user_name)
 
-            response_data = {"responseCode": 0,
-                             "responseMessage": "ADD_TO_POOL_SUCCESS"}
+        # Update the status to "active"
+        user.status = "active"
+        user.save()
 
-        except json.JSONDecodeError:
-            response_data = {"responseCode": 1,
-                             "responseMessage": "ADD_TO_POOL_ERROR"}
+        logger.info(f"Added user {user_name} to pool successfully.")
+        return JsonResponse({
+            "responseCode": 0,
+            "responseMessage": "ADD_TO_POOL_SUCCESS"
+        })
 
-        return JsonResponse(response_data)
+    except game.DoesNotExist:
+        logger.warning(f"Attempt to add nonexistent user {user_name} to pool.")
+        return JsonResponse({
+            "responseCode": 5,
+            "responseMessage": "User does not exist"
+        }, status=404)  # HTTP 404 Not Found
+
+    except json.JSONDecodeError:
+        logger.error("Failed to decode JSON request body during add_to_pool.")
+        return JsonResponse({
+            "responseCode": 1,
+            "responseMessage": "ADD_TO_POOL_ERROR"
+        }, status=400)  # HTTP 400 Bad Request
+
+    except Exception as e:
+        logger.error(f"Unexpected error during add_to_pool: {e}")
+        return JsonResponse({
+            "responseCode": 2,
+            "responseMessage": "Internal server error"
+        }, status=500)  # HTTP 500 Internal Server Error
 
 
 @csrf_exempt
 def remove_from_pool(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            user_name = data.get('userName')
+    """
+    Removes a user from the pool.
+    """
+    if request.method != 'POST':
+        return JsonResponse({
+            "responseCode": 3,
+            "responseMessage": "Method not allowed"
+        }, status=405)  # HTTP 405 Method Not Allowed
 
-            user = game.objects.get(user_name=user_name)
+    try:
+        data = json.loads(request.body)
+        user_name = data.get('userName')
 
-            # Update the status to "active"
-            user.status = "inactive"
+        if not user_name:
+            return JsonResponse({
+                "responseCode": 4,
+                "responseMessage": "Username is required"
+            }, status=400)  # HTTP 400 Bad Request
 
-            user.unmatched_priority = 0
-            user.save()
+        user = game.objects.get(user_name=user_name)
 
-            response_data = {"responseCode": 0,
-                             "responseMessage": "REMOVE_FROM_POOL_SUCCESS"}
+        # Update the status to "inactive"
+        user.status = "inactive"
+        user.unmatched_priority = 0
+        user.save()
 
-        except json.JSONDecodeError:
-            response_data = {"responseCode": 1,
-                             "responseMessage": "REMOVE_FROM_POOL_ERROR"}
+        logger.info(f"Removed user {user_name} from pool successfully.")
+        return JsonResponse({
+            "responseCode": 0,
+            "responseMessage": "REMOVE_FROM_POOL_SUCCESS"
+        })
 
-        return JsonResponse(response_data)
+    except game.DoesNotExist:
+        logger.warning(f"Attempt to remove nonexistent user {user_name} from pool.")
+        return JsonResponse({
+            "responseCode": 5,
+            "responseMessage": "User does not exist"
+        }, status=404)  # HTTP 404 Not Found
 
+    except json.JSONDecodeError:
+        logger.error("Failed to decode JSON request body during remove_from_pool.")
+        return JsonResponse({
+            "responseCode": 1,
+            "responseMessage": "REMOVE_FROM_POOL_ERROR"
+        }, status=400)  # HTTP 400 Bad Request
+
+    except Exception as e:
+        logger.error(f"Unexpected error during remove_from_pool: {e}")
+        return JsonResponse({
+            "responseCode": 2,
+            "responseMessage": "Internal server error"
+        }, status=500)  # HTTP 500 Internal Server Error
+
+
+def fetch_court_status():
+    """
+    Fetch the status of all courts in the system.
+    Returns a dictionary with court keys and their respective name and status.
+    """
+    all_courts = court.objects.all()
+    return {
+        f'court{c.id}': {
+            "name": c.court_name,
+            "status": c.status,
+        } for c in all_courts
+    }
+
+
+def select_player(sorted_players, team):
+    for player in sorted_players:
+        if not any([p in team for p in history.objects.filter(player1=player).values_list('player2', flat=True)]) and \
+           not any([p in team for p in history.objects.filter(player2=player).values_list('player1', flat=True)]):
+            return player
+    return sorted_players[0]  # Return the top-ranked player if no unmatched player is found
 
 def generate_pairing():
     try:
-        # Fetch all players with the "active" status and "playing" status as "N"
         available_players = game.objects.filter(status="active", playing="N")
+        if len(available_players) < 4:
+            return {"responseCode": 1, "responseMessage": "Not enough players for matches."}
 
-        # Sort players based on unmatched priority, uncertainty, and ELO
-        sorted_players = sorted(
-            available_players, key=lambda p: (-p.unmatched_priority, -p.uncertainty, p.elo_rating))
-
-        if len(sorted_players) < 4:  # Check if there are enough players for four matches
-            return JsonResponse({"responseCode": 1, "responseMessage": "Not enough players for matches."})
-
-        pairings = []
+        # Sorting and pairing logic
+        sorted_players = sorted(available_players, key=lambda p: (-p.unmatched_priority, -p.uncertainty, p.elo_rating))
+        pairings, selected_players = [], []
         for _ in range(1):  # Create four pairings for four matches
-            team1 = []
-            team2 = []
-
-            # Select two players for team1
+            team1, team2 = [], []
             for _ in range(2):
-                player = select_player(sorted_players)
+                player = select_player(sorted_players, team1)
                 team1.append(player)
                 sorted_players.remove(player)
-
-            # Select two players for team2
             for _ in range(2):
-                player = select_player(sorted_players)
+                player = select_player(sorted_players, team2)
                 team2.append(player)
                 sorted_players.remove(player)
-
             pairings.append((team1, team2))
+            selected_players.extend(team1 + team2)
 
-        # Update the "playing" column for all selected players to "Y"
-        selected_players = [
-            player for team in pairings for player in team[0] + team[1]]
-        game.objects.filter(
-            pk__in=[player.pk for player in selected_players]).update(playing="Y")
+        # Updating players' status and history in DB
+        game.objects.filter(pk__in=[player.pk for player in selected_players]).update(playing="Y")
+        game.objects.filter(pk__in=[player.pk for player in sorted_players]).update(unmatched_priority=F('unmatched_priority') + 1)
+        game.objects.filter(pk__in=[player.pk for player in selected_players]).update(unmatched_priority=0)
+        
+        # Update pairing history
+        today = date.today()
+        for team in pairings:
+            for player1 in team[0]:
+                for player2 in team[1]:
+                    # Check if the pairing already exists
+                    already_exists = history.objects.filter(
+                        models.Q(player1=player1, player2=player2) |
+                        models.Q(player1=player2, player2=player1)
+                    ).exists()
 
-        # Increment unmatched priority for remaining players
-        game.objects.filter(pk__in=[player.pk for player in sorted_players]).update(
-            unmatched_priority=F('unmatched_priority') + 1)
+                    if not already_exists or len(available_players) == 4:
+                        history.objects.create(player1=player1, player2=player2, date=today)
 
-        # Reset the unmatched priority for matched players
-        game.objects.filter(pk__in=[player.pk for player in selected_players]).update(
-            unmatched_priority=0)
 
-        # Create a list of teams with userName, elo, and uncertainty
+        # Formatting teams
         teams = [
             {
                 'team1': [{'userName': player.user_name, 'elo': player.elo_rating, 'uncertainty': player.uncertainty}
@@ -219,22 +365,17 @@ def generate_pairing():
             for team in pairings
         ]
 
+        # Court logic
         available_courts = court.objects.filter(status=True).order_by('id')
-
-        # Fetches the first available court
         first_available_court = available_courts.first()
-        first_available_court_key = None  # To store the key of the first available court
-
+        first_available_court_key = f'court{first_available_court.id}' if first_available_court else None
         if first_available_court:
-            first_available_court_key = f'court{first_available_court.id}'
-            first_available_court.status = False  # Sets the status to False
-            first_available_court.save()  # Saves the change to the database
-
-        # Reset pairings list to empty
-        pairings = []
+            first_available_court.status = False
+            first_available_court.save()
 
         court_status = fetch_court_status()
 
+        # Prepare response
         response_data = {
             "responseCode": 0,
             "responseMessage": "Pairing generated successfully.",
@@ -243,36 +384,15 @@ def generate_pairing():
             "firstAvailableCourt": first_available_court_key
         }
 
-        # Send WebSocket message
-        async_to_sync(channel_layer.group_send)(
-            'updates_group',
-            {
-                'type': 'send_update',
-                'message': {
-                    'updateType': 'court_status',
-                    'data': court_status
-                }
-            })
+        # Send WebSocket messages
+        async_to_sync(channel_layer.group_send)('updates_group', {'type': 'send_update', 'message': {'updateType': 'court_status', 'data': court_status}})
+        async_to_sync(channel_layer.group_send)('updates_group', {'type': 'send_update', 'message': {'updateType': 'teams', 'data': response_data}})
 
-        # Send WebSocket message
-        async_to_sync(channel_layer.group_send)(
-            'updates_group',
-            {
-                'type': 'send_update',
-                'message': {
-                    'updateType': 'teams',
-                    'data': response_data
-                }
-            })
+        return response_data
 
     except Exception as e:
-        # Handle any exceptions that may occur during pairing generation
-        print("Error:", e)
-
-
-def select_player(available_players):
-    # Select a player from available players without considering opponents
-    return random.choice(available_players)
+        logger.error(f"Error during pairing generation: {e}")
+        return {"responseCode": 2, "responseMessage": "Error occurred during pairing generation."}
 
 
 @csrf_exempt
@@ -285,6 +405,8 @@ def update_elo(request):
         winners = teamDetails['winner']
         losers = teamDetails['loser']
         court_name = teamDetails['court']
+
+        print(court_name)
 
         # K factor
         K = 30
@@ -362,6 +484,17 @@ def update_elo(request):
                     "result": outcome
                 }
 
+                # Send WebSocket message
+                async_to_sync(channel_layer.group_send)(
+                'updates_group',
+                {
+                    'type': 'send_update',
+                    'message': {
+                        'updateType': 'updatedDetailsModal',
+                        'data': updated_details
+                    }
+                })
+
         # Update ratings for winners
         handle_players(winners, 1, expected_winner)
 
@@ -374,7 +507,6 @@ def update_elo(request):
         # Handle any exceptions that may occur during pairing generation
         print("Error:", e)
         return JsonResponse({"responseCode": 2, "responseMessage": "UPDATE ELO ERROR"})
-
 
 @csrf_exempt
 def reset_database(request):
@@ -427,23 +559,19 @@ def get_court_status(request):
         return JsonResponse({"responseCode": 1, "responseMessage": "Reset Error"})
 
 
-def fetch_court_status():
-    all_courts = court.objects.all()
-
-    court_status = {}
-    for c in all_courts:
-        court_key = f'court{c.id}'
-        court_status[court_key] = {
-            "name": c.court_name,
-            "status": c.status,
-        }
-
-    return court_status
-
-
 @csrf_exempt
 def navigate_to_court_screen(request):
     try:
+
+        data = json.loads(request.body)
+        userName = data.get('userName')
+
+        print(userName)
+
+        court_status = fetch_court_status()
+
+        async_to_sync(channel_layer.group_send)('updates_group', {'type': 'send_update', 'message': {'updateType': 'court_status', 'data': court_status}})
+
         # Send WebSocket message
         async_to_sync(channel_layer.group_send)(
             'updates_group',
@@ -451,7 +579,7 @@ def navigate_to_court_screen(request):
                 'type': 'send_update',
                 'message': {
                     'updateType': 'navigateBack',
-                    'data': ""
+                    'data': userName
                 }
             })
         

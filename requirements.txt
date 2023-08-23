@@ -8,3 +8,4 @@ psycopg2>=2.8,<3.0
 daphne
 channels-redis==3.4.1
 redis
+django-crontab

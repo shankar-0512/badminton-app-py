@@ -44,7 +44,8 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "app",
     "corsheaders",
-    "channels"
+    "channels",
+    "django_crontab"
 ]
 
 MIDDLEWARE = [
@@ -169,6 +170,11 @@ CHANNEL_LAYERS = {
         },
     }
 }
+
+CRONJOBS = [
+    ('0 0 * * *', 'app.cron.clear_history')
+]
+
 
 #"symmetric_encryption_keys": [SECRET_KEY],
 
