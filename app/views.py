@@ -321,7 +321,7 @@ def generate_pairing():
         # Sorting and pairing logic
         sorted_players = sorted(available_players, key=lambda p: (-p.unmatched_priority, -p.uncertainty, p.elo_rating))
         pairings, selected_players = [], []
-        for _ in range(1):  # Create four pairings for four matches
+        for _ in range(1):  
             team1, team2 = [], []
             for _ in range(2):
                 player = select_player(sorted_players, team1)
@@ -461,8 +461,8 @@ def update_elo(request):
 
                 # Combine with base uncertainty
                 base_uncertainty = max(0.05, 1 - user.played / 100)
-                user.uncertainty = min(
-                    1, max(0.05, base_uncertainty * sd_factor * decay_factor))
+                user.uncertainty = round(min(
+                    1, max(0.05, base_uncertainty * sd_factor * decay_factor)),2)
 
                 # Update last played date
                 user.last_played = datetime.now().date()
@@ -597,3 +597,41 @@ def player_joined(sender, instance, **kwargs):
     active_players = game.objects.filter(status="active").count()
     if active_players >= 4:
         generate_pairing()
+
+
+from django.http import JsonResponse
+import json
+
+@csrf_exempt
+def fetch_user_data(request):
+    try:
+        data = json.loads(request.body)
+        userName = data.get('userName')
+
+        user_game = game.objects.get(user_name=userName)
+
+        # Convert rating_changes from comma-separated string to a list of integers
+        rating_changes_list = list(map(int, user_game.rating_changes.split(','))) if user_game.rating_changes else []
+
+        # Keep only the last 10 changes if there are more than 10
+        if len(rating_changes_list) > 10:
+            rating_changes_list = rating_changes_list[-10:]
+
+        # Extract the last 5 changes for display
+        last_five_changes = rating_changes_list[-5:]
+
+        response_data = {
+            "username": user_game.user_name,
+            "currentRating": user_game.elo_rating,
+            "lastFiveGames": last_five_changes
+        }
+
+        return JsonResponse({"responseCode": 0, "responseMessage": "Profile Success", "userData": response_data})
+
+    except game.DoesNotExist:
+        return JsonResponse({"responseCode": 2, "responseMessage": "User not found"})
+
+    except Exception as e:
+        # Handle any exceptions that may occur
+        print("Error:", e)
+        return JsonResponse({"responseCode": 1, "responseMessage": "Profile Error"})

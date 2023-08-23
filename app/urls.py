@@ -13,4 +13,5 @@ urlpatterns = [
     path('resetDatabase/', views.reset_database, name='resetDatabase'),
     path('getCourtStatus/', views.get_court_status, name='getCourtStatus'),
     path('navigateToCourtScreen/', views.navigate_to_court_screen, name='navigateToCourtScreen'),
+    path('fetchUserDetails/', views.fetch_user_data, name='fetchUserDetails'),
 ]
