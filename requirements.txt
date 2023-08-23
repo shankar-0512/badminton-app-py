@@ -6,6 +6,6 @@ django-cors-headers==3.10.0
 channels
 psycopg2>=2.8,<3.0
 daphne
-channels-redis==3.4.1
+channels-redis
 redis
 django-crontab
