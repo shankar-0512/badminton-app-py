@@ -157,16 +157,10 @@ import ssl
 ssl_context = ssl.SSLContext()
 ssl_context.check_hostname = False
 
-heroku_redis_ssl_host = (
-    "ec2-63-32-201-87.eu-west-1.compute.amazonaws.com", 
-    11150, 
-    {
-        "ssl_handshake_timeout": 1,
-        "ssl_cert_reqs": ssl.CERT_NONE
-    }
-)
-
-
+heroku_redis_ssl_host = {
+    "address": "rediss://:pe0fa47f847713f19c6268c887bde5e448ff9d9911ddf996f6d2a0979c0ad5893@ec2-63-32-201-87.eu-west-1.compute.amazonaws.com:11150",
+    "ssl": ssl_context
+}
 
 CHANNEL_LAYERS = {
     'default': {
