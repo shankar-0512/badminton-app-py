@@ -48,9 +48,9 @@ class history(models.Model):
         return f"Matchup between {self.player1} and {self.player2} on {self.date}"
 
     @staticmethod
-    def has_recent_matchup(player1_id, player2_id, days_threshold=30):
+    def has_recent_matchup(player1_id, player2_id):
         """Check if two players have had a matchup in the last `days_threshold` days."""
-        cutoff_date = date.today() - timedelta(days=days_threshold)
+        cutoff_date = date.today()
         return history.objects.filter(
             models.Q(player1_id=player1_id, player2_id=player2_id) |
             models.Q(player1_id=player2_id, player2_id=player1_id),
