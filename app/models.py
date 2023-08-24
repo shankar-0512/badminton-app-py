@@ -1,4 +1,8 @@
+# Django imports
 from django.db import models
+
+# Python standard library imports
+from datetime import date, timedelta
 
 
 class game(models.Model):
@@ -6,23 +10,21 @@ class game(models.Model):
     status = models.TextField(default="inactive")
     elo_rating = models.IntegerField(default=1500)
     uncertainty = models.FloatField(default=1)
-    playing = models.CharField(default="N")
+    playing = models.CharField(default="N", max_length=1)
     played = models.IntegerField(default=0)
     won = models.IntegerField(default=0)
     lost = models.IntegerField(default=0)
-    # update the date automatically every time an entry is updated
     last_played = models.DateField(auto_now=True)
-    # store the ELO changes as a comma-separated string
     rating_changes = models.TextField(default="")
     unmatched_priority = models.IntegerField(default=0)
     password = models.TextField(default="")
 
     class Meta:
-        managed = True  # Tell Django not to manage this table with migrations
+        managed = True
         db_table = 'player_details'
 
     def __str__(self):
-        return self.user_name  # Return a meaningful representation of the model instance
+        return self.user_name
 
 
 class court(models.Model):
@@ -30,7 +32,7 @@ class court(models.Model):
     status = models.BooleanField(default=True)
 
     class Meta:
-        managed = True  # Tell Django not to manage this table with migrations
+        managed = True
         db_table = 'court_status'
 
 
@@ -40,9 +42,7 @@ class history(models.Model):
     date = models.DateField(auto_now_add=True)
 
     class Meta:
-    # Removed constraints for now
-        pass
-
+        pass  # If not using any constraints or options, consider removing the whole Meta class
 
     def __str__(self):
         return f"Matchup between {self.player1} and {self.player2} on {self.date}"
@@ -50,7 +50,6 @@ class history(models.Model):
     @staticmethod
     def has_recent_matchup(player1_id, player2_id, days_threshold=30):
         """Check if two players have had a matchup in the last `days_threshold` days."""
-        from datetime import date, timedelta
         cutoff_date = date.today() - timedelta(days=days_threshold)
         return history.objects.filter(
             models.Q(player1_id=player1_id, player2_id=player2_id) |

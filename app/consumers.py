@@ -2,30 +2,50 @@ import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 
 class UpdateConsumer(AsyncWebsocketConsumer):
+    """
+    WebSocket consumer to handle real-time updates.
+    """
+
     async def connect(self):
+        """
+        Handle new WebSocket connections. A new connection will be added 
+        to the "updates_group".
+        """
+        
+        # Define the room group name. All connected clients will be part of this group.
         self.room_group_name = 'updates_group'
         
-        # Join room group
+        # Add the new connection to the room group
         await self.channel_layer.group_add(
             self.room_group_name,
             self.channel_name
         )
 
+        # Accept the WebSocket connection
         await self.accept()
 
     async def disconnect(self, close_code):
-        # Leave room group
+        """
+        Handle WebSocket disconnections. The connection will be removed
+        from the "updates_group".
+        """
+        
+        # Remove the connection from the room group
         await self.channel_layer.group_discard(
             self.room_group_name,
             self.channel_name
         )
 
     async def receive(self, text_data):
-        """Receive message from WebSocket"""
+        """
+        Handle messages received from a WebSocket.
+        """
+        
+        # Parse the received data
         text_data_json = json.loads(text_data)
         message = text_data_json['message']
 
-        # Send message to room group
+        # Broadcast the message to all members of the room group
         await self.channel_layer.group_send(
             self.room_group_name,
             {
@@ -35,10 +55,15 @@ class UpdateConsumer(AsyncWebsocketConsumer):
         )
 
     async def send_update(self, event):
-        """Receive event message and send it to the WebSocket"""
+        """
+        Handle "send_update" events by sending the event's message 
+        back to the WebSocket.
+        """
+        
+        # Extract message from event
         message = event['message']
         
-        # Send message to WebSocket
+        # Send the extracted message to the WebSocket
         await self.send(text_data=json.dumps({
             'message': message
         }))

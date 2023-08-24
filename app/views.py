@@ -1,26 +1,29 @@
+# Python standard libraries
+import json
+import math
+import logging
+from datetime import datetime, date
+
+# Django core libraries
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-import math
-import json
-import random
 from django.db import models
-from .models import game
-from .models import court
-from datetime import datetime
-from datetime import date
 from django.db.models import F
-from django.contrib.auth.hashers import make_password, check_password
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-import logging
-from .models import history
+from django.contrib.auth.hashers import make_password, check_password
 
+# Django-related third-party libraries
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
+# Application-specific modules
+from .models import game, court, history
+
+# Set up channel layer and logging
 channel_layer = get_channel_layer()
-
-# Set up logging
 logger = logging.getLogger(__name__)
+
 
 
 @csrf_exempt
@@ -136,51 +139,6 @@ def signup(request):
 
 
 @csrf_exempt
-def fetch_active_players(request):
-    """
-    Fetch active players.
-    """
-    if request.method != 'GET':
-        return JsonResponse({
-            "responseCode": 3,
-            "responseMessage": "Method not allowed"
-        }, status=405)  # HTTP 405 Method Not Allowed
-
-    try:
-        # Fetch all players with the "active" status and "playing" status as "N"
-        available_players = game.objects.filter(status="active", playing="N")
-        # Get the count of active players
-        active_players_count = available_players.count()
-
-        # Send WebSocket message
-        async_to_sync(channel_layer.group_send)(
-            'updates_group',
-            {
-                'type': 'send_update',
-                'message': {
-                    'updateType': 'active_players',
-                    # This can be the updated list of active players or a count
-                    'data': active_players_count
-                }
-            }
-        )
-
-        logger.info("Active players fetched successfully.")
-        return JsonResponse({
-            "responseCode": 0,
-            "responseMessage": "Active players fetched successfully.",
-            "activePlayersCount": active_players_count  # Include the count in the response
-        })
-
-    except Exception as e:
-        logger.error(f"Error occurred during fetching active players: {e}")
-        return JsonResponse({
-            "responseCode": 2,
-            "responseMessage": "Error occurred during fetching active players."
-        }, status=500)  # HTTP 500 Internal Server Error
-
-
-@csrf_exempt
 def add_to_pool(request):
     """
     Adds a user to the pool.
@@ -291,6 +249,85 @@ def remove_from_pool(request):
         }, status=500)  # HTTP 500 Internal Server Error
 
 
+@csrf_exempt
+def fetch_active_players(request):
+    """
+    Fetch active players.
+    """
+    if request.method != 'GET':
+        return JsonResponse({
+            "responseCode": 3,
+            "responseMessage": "Method not allowed"
+        }, status=405)  # HTTP 405 Method Not Allowed
+
+    try:
+        # Fetch all players with the "active" status and "playing" status as "N"
+        available_players = game.objects.filter(status="active", playing="N")
+        # Get the count of active players
+        active_players_count = available_players.count()
+
+        # Send WebSocket message
+        async_to_sync(channel_layer.group_send)(
+            'updates_group',
+            {
+                'type': 'send_update',
+                'message': {
+                    'updateType': 'active_players',
+                    # This can be the updated list of active players or a count
+                    'data': active_players_count
+                }
+            }
+        )
+
+        logger.info("Active players fetched successfully.")
+        return JsonResponse({
+            "responseCode": 0,
+            "responseMessage": "Active players fetched successfully.",
+            "activePlayersCount": active_players_count  # Include the count in the response
+        })
+
+    except Exception as e:
+        logger.error(f"Error occurred during fetching active players: {e}")
+        return JsonResponse({
+            "responseCode": 2,
+            "responseMessage": "Error occurred during fetching active players."
+        }, status=500)  # HTTP 500 Internal Server Error
+
+
+@csrf_exempt
+def fetch_user_data(request):
+    try:
+        data = json.loads(request.body)
+        user_name = data.get('userName')
+
+        user_game = game.objects.get(user_name=user_name)
+
+        # Convert rating_changes from comma-separated string to a list of integers
+        rating_changes_list = [int(item) for item in user_game.rating_changes.split(',')] if user_game.rating_changes else []
+
+        # Keep only the last 10 changes if there are more than 10
+        rating_changes_list = rating_changes_list[-10:]
+
+        # Extract the last 5 changes for display
+        last_five_changes = rating_changes_list[-5:]
+
+        response_data = {
+            "username": user_game.user_name,
+            "currentRating": user_game.elo_rating,
+            "lastFiveGames": last_five_changes
+        }
+
+        return JsonResponse({"responseCode": 0, "responseMessage": "Profile Success", "userData": response_data})
+
+    except game.DoesNotExist:
+        logger.warning(f"User with name {user_name} not found.")
+        return JsonResponse({"responseCode": 2, "responseMessage": "User not found"})
+
+    except Exception as e:
+        logger.error(f"Error fetching user data for {user_name}: {e}")
+        return JsonResponse({"responseCode": 1, "responseMessage": "Profile Error"})
+
+
 def fetch_court_status():
     """
     Fetch the status of all courts in the system.
@@ -307,22 +344,30 @@ def fetch_court_status():
 
 def select_player(sorted_players, team):
     for player in sorted_players:
-        if not any([p in team for p in history.objects.filter(player1=player).values_list('player2', flat=True)]) and \
-           not any([p in team for p in history.objects.filter(player2=player).values_list('player1', flat=True)]):
+        player1_history = history.objects.filter(player1=player).values_list('player2', flat=True)
+        player2_history = history.objects.filter(player2=player).values_list('player1', flat=True)
+        
+        if not any(p in team for p in player1_history) and not any(p in team for p in player2_history):
             return player
     return sorted_players[0]  # Return the top-ranked player if no unmatched player is found
+
 
 def generate_pairing():
     try:
         available_players = game.objects.filter(status="active", playing="N")
+        
         if len(available_players) < 4:
-            return {"responseCode": 1, "responseMessage": "Not enough players for matches."}
+            return {
+                "responseCode": 1,
+                "responseMessage": "Not enough players for matches."
+            }
 
-        # Sorting and pairing logic
         sorted_players = sorted(available_players, key=lambda p: (-p.unmatched_priority, -p.uncertainty, p.elo_rating))
+        
         pairings, selected_players = [], []
         for _ in range(1):  
             team1, team2 = [], []
+            
             for _ in range(2):
                 player = select_player(sorted_players, team1)
                 team1.append(player)
@@ -331,20 +376,18 @@ def generate_pairing():
                 player = select_player(sorted_players, team2)
                 team2.append(player)
                 sorted_players.remove(player)
+            
             pairings.append((team1, team2))
             selected_players.extend(team1 + team2)
 
         # Updating players' status and history in DB
-        game.objects.filter(pk__in=[player.pk for player in selected_players]).update(playing="Y")
+        game.objects.filter(pk__in=[player.pk for player in selected_players]).update(playing="Y", unmatched_priority=0)
         game.objects.filter(pk__in=[player.pk for player in sorted_players]).update(unmatched_priority=F('unmatched_priority') + 1)
-        game.objects.filter(pk__in=[player.pk for player in selected_players]).update(unmatched_priority=0)
         
-        # Update pairing history
         today = date.today()
         for team in pairings:
             for player1 in team[0]:
                 for player2 in team[1]:
-                    # Check if the pairing already exists
                     already_exists = history.objects.filter(
                         models.Q(player1=player1, player2=player2) |
                         models.Q(player1=player2, player2=player1)
@@ -352,7 +395,6 @@ def generate_pairing():
 
                     if not already_exists or len(available_players) == 4:
                         history.objects.create(player1=player1, player2=player2, date=today)
-
 
         # Formatting teams
         teams = [
@@ -365,17 +407,16 @@ def generate_pairing():
             for team in pairings
         ]
 
-        # Court logic
         available_courts = court.objects.filter(status=True).order_by('id')
         first_available_court = available_courts.first()
         first_available_court_key = f'court{first_available_court.id}' if first_available_court else None
+        
         if first_available_court:
             first_available_court.status = False
             first_available_court.save()
 
         court_status = fetch_court_status()
 
-        # Prepare response
         response_data = {
             "responseCode": 0,
             "responseMessage": "Pairing generated successfully.",
@@ -388,11 +429,15 @@ def generate_pairing():
         async_to_sync(channel_layer.group_send)('updates_group', {'type': 'send_update', 'message': {'updateType': 'court_status', 'data': court_status}})
         async_to_sync(channel_layer.group_send)('updates_group', {'type': 'send_update', 'message': {'updateType': 'teams', 'data': response_data}})
 
+        logger.info("Pairing generated successfully.")
         return response_data
 
     except Exception as e:
         logger.error(f"Error during pairing generation: {e}")
-        return {"responseCode": 2, "responseMessage": "Error occurred during pairing generation."}
+        return {
+            "responseCode": 2,
+            "responseMessage": "Error occurred during pairing generation."
+        }
 
 
 @csrf_exempt
@@ -400,47 +445,35 @@ def update_elo(request):
     try:
         # Load the JSON data from the request
         data = json.loads(request.body)
-        teamDetails = data.get('teamDetails')
+        team_details = data.get('teamDetails')
 
-        winners = teamDetails['winner']
-        losers = teamDetails['loser']
-        court_name = teamDetails['court']
+        winners = team_details['winner']
+        losers = team_details['loser']
+        court_name = team_details['court']
 
-        print(court_name)
-
-        # K factor
+        # Constants
         K = 30
-        # Factors for tuning uncertainty
         F1 = 30
         F2 = 180
 
-        # Updated details dictionary
         updated_details = {}
 
-        # Calculate average rating for winners and losers
-        winner_avg_rating = sum([game.objects.get(
-            user_name=winner['userName']).elo_rating for winner in winners]) / len(winners)
-        loser_avg_rating = sum([game.objects.get(
-            user_name=loser['userName']).elo_rating for loser in losers]) / len(losers)
+        def calculate_average_rating(players):
+            return sum([game.objects.get(user_name=player['userName']).elo_rating for player in players]) / len(players)
+
+        winner_avg_rating = calculate_average_rating(winners)
+        loser_avg_rating = calculate_average_rating(losers)
 
         # Calculate expected score
-        expected_winner = 1 / \
-            (1 + 10 ** ((loser_avg_rating - winner_avg_rating) / 400))
+        expected_winner = 1 / (1 + 10 ** ((loser_avg_rating - winner_avg_rating) / 400))
         expected_loser = 1 - expected_winner
 
-        # Function to handle updating players
         def handle_players(team, outcome, expected_outcome):
             for player in team:
                 user = game.objects.get(user_name=player['userName'])
-                rating_change = round(
-                    user.elo_rating + K * (outcome - expected_outcome)) - user.elo_rating
+                rating_change = round(K * (outcome - expected_outcome))
 
-                # Update rating changes
-                rating_changes_str = user.rating_changes or ""
-                user.rating_changes = ",".join(
-                    filter(None, [rating_changes_str, str(rating_change)]))
-
-                # Update ELO rating
+                user.rating_changes = ",".join(filter(None, [user.rating_changes or "", str(rating_change)]))
                 user.elo_rating += rating_change
                 user.status = "inactive"
                 user.playing = 'N'
@@ -448,46 +481,27 @@ def update_elo(request):
                 user.won += outcome
                 user.lost += 1 - outcome
 
-                # Calculate Standard Deviation
-                rating_changes_list = [
-                    int(x) for x in user.rating_changes.split(",") if x]
-                sd_factor = 1 + (math.sqrt(sum([(x - sum(rating_changes_list)/len(rating_changes_list))
-                                                ** 2 for x in rating_changes_list]) / len(rating_changes_list)) if rating_changes_list else 0)/F1
+                rating_changes_list = [int(x) for x in user.rating_changes.split(",") if x]
+                sd_factor = 1 + (math.sqrt(sum([(x - sum(rating_changes_list)/len(rating_changes_list)) ** 2 for x in rating_changes_list]) / len(rating_changes_list)) if rating_changes_list else 0) / F1
 
-                # Time Decay Factor
-                days_since_last_game = (datetime.now().date() -
-                                        (user.last_played or datetime.now().date())).days
-                decay_factor = 1 + days_since_last_game/F2
-
-                # Combine with base uncertainty
+                days_since_last_game = (datetime.now().date() - (user.last_played or datetime.now().date())).days
+                decay_factor = 1 + days_since_last_game / F2
                 base_uncertainty = max(0.05, 1 - user.played / 100)
-                user.uncertainty = round(min(
-                    1, max(0.05, base_uncertainty * sd_factor * decay_factor)),2)
-
-                # Update last played date
+                user.uncertainty = round(min(1, max(0.05, base_uncertainty * sd_factor * decay_factor)), 2)
                 user.last_played = datetime.now().date()
                 user.save()
 
-                # Fetch the court by its name
                 court_to_update = court.objects.get(court_name=court_name)
-
-                # Update the status to True
                 court_to_update.status = True
-
-                # Save the changes to the database
                 court_to_update.save()
 
-                # Add the updated details of the user to the response
                 updated_details[user.user_name] = {
                     "eloRating": user.elo_rating,
                     "ratingDiff": rating_change,
                     "result": outcome
                 }
 
-                # Send WebSocket message
-                async_to_sync(channel_layer.group_send)(
-                'updates_group',
-                {
+                async_to_sync(channel_layer.group_send)('updates_group', {
                     'type': 'send_update',
                     'message': {
                         'updateType': 'updatedDetailsModal',
@@ -495,18 +509,69 @@ def update_elo(request):
                     }
                 })
 
-        # Update ratings for winners
         handle_players(winners, 1, expected_winner)
-
-        # Update ratings for losers
         handle_players(losers, 0, expected_loser)
 
-        return JsonResponse({'responseCode': 0, "responseMessage": "UPDATE ELO SUCCESS", "updatedDetails": updated_details})
+        return JsonResponse({'responseCode': 0, "responseMessage": "ELO updated successfully.", "updatedDetails": updated_details})
 
     except Exception as e:
-        # Handle any exceptions that may occur during pairing generation
-        print("Error:", e)
-        return JsonResponse({"responseCode": 2, "responseMessage": "UPDATE ELO ERROR"})
+        logger.error(f"Error during ELO update: {e}")
+        return JsonResponse({"responseCode": 2, "responseMessage": "Error occurred during ELO update."})
+
+
+@csrf_exempt
+def get_court_status(request):
+    try:
+        court_status = fetch_court_status()
+        return JsonResponse({
+            "responseCode": 0,
+            "responseMessage": "Reset Successful",
+            "courtStatus": court_status
+        }, safe=False)
+
+    except Exception as e:
+        logger.error(f"Error while getting court status: {e}")
+        return JsonResponse({"responseCode": 1, "responseMessage": "Reset Error"})
+
+
+@csrf_exempt
+def navigate_to_court_screen(request):
+    try:
+        data = json.loads(request.body)
+        user_name = data.get('userName')
+
+        court_status = fetch_court_status()
+
+        async_to_sync(channel_layer.group_send)('updates_group', {
+            'type': 'send_update',
+            'message': {
+                'updateType': 'court_status',
+                'data': court_status
+            }
+        })
+
+        async_to_sync(channel_layer.group_send)('updates_group', {
+            'type': 'send_update',
+            'message': {
+                'updateType': 'navigateBack',
+                'data': user_name
+            }
+        })
+
+        return JsonResponse({"responseCode": 0, "responseMessage": "Navigation Success"})
+
+    except Exception as e:
+        logger.error(f"Error during navigation to court screen: {e}")
+        return JsonResponse({"responseCode": 1, "responseMessage": "Navigation Error"})
+
+
+@receiver(post_save, sender=game)
+def player_joined(sender, instance, **kwargs):
+    # Check if there are at least 4 active players to generate pairing.
+    active_players_count = game.objects.filter(status="active").count()
+    if active_players_count >= 4:
+        generate_pairing()
+
 
 @csrf_exempt
 def reset_database(request):
@@ -539,99 +604,3 @@ def reset_database(request):
         # Handle any exceptions that may occur during fetching active players
         print("Error:", e)
         return JsonResponse({"responseCode": 2, "responseMessage": "Reset Error"})
-
-
-@csrf_exempt
-def get_court_status(request):
-    try:
-        court_status = fetch_court_status()
-
-        response_data = {
-            "responseCode": 0,
-            "responseMessage": "Reset Successful",
-            "courtStatus": court_status
-        }
-        return JsonResponse(response_data, safe=False)
-
-    except Exception as e:
-        # Handle any exceptions that may occur during fetching active players
-        print("Error:", e)
-        return JsonResponse({"responseCode": 1, "responseMessage": "Reset Error"})
-
-
-@csrf_exempt
-def navigate_to_court_screen(request):
-    try:
-
-        data = json.loads(request.body)
-        userName = data.get('userName')
-
-        print(userName)
-
-        court_status = fetch_court_status()
-
-        async_to_sync(channel_layer.group_send)('updates_group', {'type': 'send_update', 'message': {'updateType': 'court_status', 'data': court_status}})
-
-        # Send WebSocket message
-        async_to_sync(channel_layer.group_send)(
-            'updates_group',
-            {
-                'type': 'send_update',
-                'message': {
-                    'updateType': 'navigateBack',
-                    'data': userName
-                }
-            })
-        
-        return JsonResponse({"responseCode": 0, "responseMessage": "Navigation Success"})
-
-    except Exception as e:
-        # Handle any exceptions that may occur during fetching active players
-        print("Error:", e)
-        return JsonResponse({"responseCode": 1, "responseMessage": "Navigation Error"})
-
-
-@receiver(post_save, sender=game)
-def player_joined(sender, instance, **kwargs):
-    # Check the count of active players
-    active_players = game.objects.filter(status="active").count()
-    if active_players >= 4:
-        generate_pairing()
-
-
-from django.http import JsonResponse
-import json
-
-@csrf_exempt
-def fetch_user_data(request):
-    try:
-        data = json.loads(request.body)
-        userName = data.get('userName')
-
-        user_game = game.objects.get(user_name=userName)
-
-        # Convert rating_changes from comma-separated string to a list of integers
-        rating_changes_list = list(map(int, user_game.rating_changes.split(','))) if user_game.rating_changes else []
-
-        # Keep only the last 10 changes if there are more than 10
-        if len(rating_changes_list) > 10:
-            rating_changes_list = rating_changes_list[-10:]
-
-        # Extract the last 5 changes for display
-        last_five_changes = rating_changes_list[-5:]
-
-        response_data = {
-            "username": user_game.user_name,
-            "currentRating": user_game.elo_rating,
-            "lastFiveGames": last_five_changes
-        }
-
-        return JsonResponse({"responseCode": 0, "responseMessage": "Profile Success", "userData": response_data})
-
-    except game.DoesNotExist:
-        return JsonResponse({"responseCode": 2, "responseMessage": "User not found"})
-
-    except Exception as e:
-        # Handle any exceptions that may occur
-        print("Error:", e)
-        return JsonResponse({"responseCode": 1, "responseMessage": "Profile Error"})
