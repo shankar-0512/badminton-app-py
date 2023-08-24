@@ -56,3 +56,4 @@ class history(models.Model):
             models.Q(player1_id=player2_id, player2_id=player1_id),
             date__gte=cutoff_date
         ).exists()
+    
