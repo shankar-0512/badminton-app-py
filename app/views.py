@@ -311,12 +311,16 @@ def fetch_user_data(request):
         # Extract the last 5 changes for display
         last_five_changes = rating_changes_list[-5:]
 
+        # Calculate win percentage
+        win_percentage = round((user_game.won / user_game.played) * 100, 1) if user_game.played > 0 else 0
+
         response_data = {
             "username": user_game.user_name,
             "currentRating": user_game.elo_rating,
             "played": user_game.played,
             "won": user_game.won,
             "lost": user_game.lost,
+            "winPercentage": win_percentage,
             "lastFiveGames": last_five_changes
         }
 
