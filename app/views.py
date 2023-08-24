@@ -305,9 +305,6 @@ def fetch_user_data(request):
         # Convert rating_changes from comma-separated string to a list of integers
         rating_changes_list = [int(item) for item in user_game.rating_changes.split(',')] if user_game.rating_changes else []
 
-        # Keep only the last 10 changes if there are more than 10
-        rating_changes_list = rating_changes_list[-10:]
-
         # Extract the last 5 changes for display
         last_five_changes = rating_changes_list[-5:]
 
@@ -480,7 +477,12 @@ def update_elo(request):
                 user = game.objects.get(user_name=player['userName'])
                 rating_change = round(K * (outcome - expected_outcome))
 
-                user.rating_changes = ",".join(filter(None, [user.rating_changes or "", str(rating_change)]))
+                # Updating and Truncating rating_changes_list to keep the last 10 entries
+                rating_changes_list = [int(x) for x in (user.rating_changes or "").split(",") if x]
+                rating_changes_list.append(rating_change)  # Append the new rating change
+                rating_changes_list = rating_changes_list[-10:]  # Keep only the last 10 changes
+
+                user.rating_changes = ",".join(map(str, rating_changes_list))  # Convert the list back to a string
                 user.elo_rating += rating_change
                 user.status = "inactive"
                 user.playing = 'N'
