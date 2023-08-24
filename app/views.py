@@ -314,6 +314,9 @@ def fetch_user_data(request):
         response_data = {
             "username": user_game.user_name,
             "currentRating": user_game.elo_rating,
+            "played": user_game.played,
+            "won": user_game.won,
+            "lost": user_game.lost,
             "lastFiveGames": last_five_changes
         }
 
