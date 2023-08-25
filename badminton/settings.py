@@ -172,7 +172,7 @@ CHANNEL_LAYERS = {
 }
 
 CRONJOBS = [
-    ('48 1 * * *', 'app.cron.clear_history')
+    ('54 1 * * *', 'app.cron.clear_history')
 ]
 
 #"symmetric_encryption_keys": [SECRET_KEY],
