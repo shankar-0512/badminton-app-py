@@ -86,10 +86,10 @@ ASGI_APPLICATION = 'badminton.routing.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'db93b4g3m7j3ns',
-        'USER': 'gjfbyrhqywdtis',
-        'PASSWORD': 'fd919c103af50787b4f68dac60f9c4a36c26f7d424df05fb573e19a19ce92bfb',
-        'HOST': 'ec2-54-155-46-64.eu-west-1.compute.amazonaws.com',
+        'NAME': 'testdatabase',
+        'USER': 'testuser',
+        'PASSWORD': 'abcde@123',
+        'HOST': 'localhost',
         'PORT': '5432',
     }
 }
@@ -172,7 +172,7 @@ CHANNEL_LAYERS = {
 }
 
 CRONJOBS = [
-    ('48 1 * * *', 'app.cron.clear_history')
+    ('0 0 * * *', 'app.cron.clear_history')
 ]
 
 #"symmetric_encryption_keys": [SECRET_KEY],

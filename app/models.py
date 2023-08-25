@@ -2,7 +2,7 @@
 from django.db import models
 
 # Python standard library imports
-from datetime import date, timedelta
+from datetime import date
 
 
 class game(models.Model):
