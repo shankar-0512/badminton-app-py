@@ -35,7 +35,7 @@ def login(request):
         return JsonResponse({
             "responseCode": 3,
             "responseMessage": "Method not allowed"
-        }, status=405)  # HTTP 405 Method Not Allowed
+        }) 
 
     try:
         data = json.loads(request.body)
@@ -46,7 +46,7 @@ def login(request):
             return JsonResponse({
                 "responseCode": 4,
                 "responseMessage": "Username and password are required"
-            }, status=400)  # HTTP 400 Bad Request
+            })
 
         user = game.objects.filter(user_name=username).first()
 
@@ -62,21 +62,21 @@ def login(request):
         return JsonResponse({
             "responseCode": 1,
             "responseMessage": "Invalid username or password"
-        }, status=401)  # HTTP 401 Unauthorized
+        })
 
     except json.JSONDecodeError:
         logger.error("Failed to decode JSON request body")
         return JsonResponse({
             "responseCode": 5,
             "responseMessage": "Malformed request"
-        }, status=400)  # HTTP 400 Bad Request
+        })
 
     except Exception as e:
         logger.error(f"Login error: {e}")
         return JsonResponse({
             "responseCode": 2,
             "responseMessage": "Internal server error"
-        }, status=500)  # HTTP 500 Internal Server Error
+        })
 
 
 @csrf_exempt
@@ -88,25 +88,40 @@ def signup(request):
         return JsonResponse({
             "responseCode": 2,
             "responseMessage": "Method not allowed"
-        }, status=405)  # HTTP 405 Method Not Allowed
+        })
 
     try:
         data = json.loads(request.body)
         username = data.get('userName')
         password = data.get('password')
+        confirmPassword = data.get('confirmPassword')
 
         if not username or not password:
             return JsonResponse({
                 "responseCode": 4,
                 "responseMessage": "Username and password are required"
-            }, status=400)  # HTTP 400 Bad Request
+            })
+
+        # Check if passwords match
+        if password != confirmPassword:
+            return JsonResponse({
+                "responseCode": 6,
+                "responseMessage": "Passwords do not match!"
+            })
+
+        # Check for password length
+        if len(password) < 5:
+            return JsonResponse({
+                "responseCode": 7,
+                "responseMessage": "Password should be at least 5 characters long!"
+            })
 
         if game.objects.filter(user_name=username).exists():
             logger.warning(f"Signup attempt with existing username: {username}")
             return JsonResponse({
                 "responseCode": 1,
                 "responseMessage": "Nickname already exists"
-            }, status=409)  # HTTP 409 Conflict
+            }) 
 
         hashed_password = make_password(password)
 
@@ -128,14 +143,14 @@ def signup(request):
         return JsonResponse({
             "responseCode": 5,
             "responseMessage": "Malformed request"
-        }, status=400)  # HTTP 400 Bad Request
+        }) 
 
     except Exception as e:
         logger.error(f"Signup error: {e}")
         return JsonResponse({
             "responseCode": 3,
             "responseMessage": "Internal server error"
-        }, status=500)  # HTTP 500 Internal Server Error
+        }) 
 
 
 @csrf_exempt
