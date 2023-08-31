@@ -497,7 +497,7 @@ def update_elo(request):
 
                 user.rating_changes = ",".join(map(str, rating_changes_list))  # Convert the list back to a string
                 user.elo_rating += rating_change
-                #user.status = "inactive"
+                user.status = "inactive"
                 user.playing = 'N'
                 user.played += 1
                 user.won += outcome
@@ -587,15 +587,16 @@ def navigate_to_court_screen(request):
         return JsonResponse({"responseCode": 1, "responseMessage": "Navigation Error"})
 
 
-#@receiver(post_save, sender=game)
-#def player_joined(sender, instance, **kwargs):
+@receiver(post_save, sender=game)
+def player_joined(sender, instance, **kwargs):
     # Check if there are at least 4 active players to generate pairing.
+    active_players_count = game.objects.filter(status="active", playing="N").count()
     
-    # Filter by both 'status="active"' and 'playing!="Y"'
-#    active_players_count = game.objects.filter(status="active", playing="N").count()
+    # Check if there is at least 1 court available
+    available_court_count = court.objects.filter(status=True).count()
     
-#    if active_players_count >= 4:
-#        generate_pairing()
+    if active_players_count >= 4 and available_court_count >= 1:
+        generate_pairing()
 
 
 @csrf_exempt
@@ -638,18 +639,18 @@ def reset_database(request):
 
 ######################################################## TESTING ########################################################
 
-from django.http import JsonResponse
-from rest_framework.decorators import api_view
-import requests
-import random
-from django.http import HttpResponse
+#from django.http import JsonResponse
+#from rest_framework.decorators import api_view
+#import requests
+#import random
+#from django.http import HttpResponse
 
-@api_view(['POST'])
-def run_simulation(request):
+#@api_view(['POST'])
+#def run_simulation(request):
     game.objects.all().update(status='active')
 
     # Loop 1000 times
-    for i in range(5):
+    for i in range(1000):
         response2 = generate_pairing()  # Generate pairing
         callUpdateElo(response2)  # Update ELO
 
@@ -704,13 +705,13 @@ def run_simulation(request):
 
 
 # Function to format the court name
-def format_court_name(court_key):
+#def format_court_name(court_key):
     # Extract the last digit from the court key
     court_number = court_key[-1]
     # Create the new court name by attaching the extracted number
     return f"Court-{court_number}"
 
-def callUpdateElo(response2):
+#def callUpdateElo(response2):
     teams = response2.get('teams', [])
 
     # Assuming we're dealing with the first pairing
@@ -731,7 +732,7 @@ def callUpdateElo(response2):
     }
 
     # Step 3: Update ELO
-    response3 = requests.post('https://badminton-app-py-c9deadd73cd5.herokuapp.com/app/updateElo/', json=payload)
+    response3 = requests.post('http://10.126.197.37:8000/app/updateElo/', json=payload)
     if response3.status_code != 200:  # Note: check for status_code, as it's an HTTP response object
         return JsonResponse({"error": "Failed to update ELO"}, status=400)
 
