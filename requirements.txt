@@ -9,3 +9,4 @@ daphne
 channels-redis==3.4.1
 redis
 django-crontab
+djangorestframework

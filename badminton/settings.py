@@ -45,7 +45,8 @@ INSTALLED_APPS = [
     "app",
     "corsheaders",
     "channels",
-    "django_crontab"
+    "django_crontab",
+    "djangorestframework"
 ]
 
 MIDDLEWARE = [
