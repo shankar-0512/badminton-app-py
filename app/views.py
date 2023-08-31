@@ -732,7 +732,7 @@ def callUpdateElo(response2):
     }
 
     # Step 3: Update ELO
-    response3 = requests.post('http://10.126.197.37:8000/app/updateElo/', json=payload)
+    response3 = requests.post('https://badminton-app-py-c9deadd73cd5.herokuapp.com/app/updateElo/', json=payload)
     if response3.status_code != 200:  # Note: check for status_code, as it's an HTTP response object
         return JsonResponse({"error": "Failed to update ELO"}, status=400)
 
