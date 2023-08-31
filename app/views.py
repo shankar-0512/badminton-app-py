@@ -386,7 +386,6 @@ def generate_pairing():
         pairings, selected_players = [], []
         for _ in range(1):  
             team1, team2 = [], []
-            
             for _ in range(2):
                 player = select_player(sorted_players, team1)
                 team1.append(player)
@@ -398,7 +397,6 @@ def generate_pairing():
             
             pairings.append((team1, team2))
             selected_players.extend(team1 + team2)
-
         # Updating players' status and history in DB
         game.objects.filter(pk__in=[player.pk for player in selected_players]).update(playing="Y", unmatched_priority=0)
         game.objects.filter(pk__in=[player.pk for player in sorted_players]).update(unmatched_priority=F('unmatched_priority') + 1)
@@ -499,7 +497,7 @@ def update_elo(request):
 
                 user.rating_changes = ",".join(map(str, rating_changes_list))  # Convert the list back to a string
                 user.elo_rating += rating_change
-                user.status = "inactive"
+                #user.status = "inactive"
                 user.playing = 'N'
                 user.played += 1
                 user.won += outcome
@@ -589,12 +587,16 @@ def navigate_to_court_screen(request):
         return JsonResponse({"responseCode": 1, "responseMessage": "Navigation Error"})
 
 
-@receiver(post_save, sender=game)
-def player_joined(sender, instance, **kwargs):
+#@receiver(post_save, sender=game)
+#def player_joined(sender, instance, **kwargs):
     # Check if there are at least 4 active players to generate pairing.
-    active_players_count = game.objects.filter(status="active").count()
-    if active_players_count >= 4:
-        generate_pairing()
+    
+    # Filter by both 'status="active"' and 'playing!="Y"'
+#    active_players_count = game.objects.filter(status="active", playing="N").count()
+    
+#    if active_players_count >= 4:
+#        generate_pairing()
+
 
 
 @csrf_exempt
@@ -602,6 +604,8 @@ def reset_database(request):
     try:
 
         all_players = game.objects.all()
+
+        all_courts = court.objects.all()
 
         # Loop through available players and reset their attributes to default values
         for player in all_players:
@@ -618,6 +622,10 @@ def reset_database(request):
             # Reset any other attributes as needed
             player.save()
 
+        for court_status in all_courts:
+            court_status.status = True
+            court_status.save()
+
         response_data = {
             "responseCode": 0,
             "responseMessage": "Reset Successful"
@@ -628,3 +636,105 @@ def reset_database(request):
         # Handle any exceptions that may occur during fetching active players
         print("Error:", e)
         return JsonResponse({"responseCode": 2, "responseMessage": "Reset Error"})
+
+######################################################## TESTING ########################################################
+
+from django.http import JsonResponse
+from rest_framework.decorators import api_view
+import requests
+import random
+from django.http import HttpResponse
+
+@api_view(['POST'])
+def run_simulation(request):
+    game.objects.all().update(status='active')
+
+    # Loop 1000 times
+    for i in range(5):
+        response2 = generate_pairing()  # Generate pairing
+        callUpdateElo(response2)  # Update ELO
+
+    # Fetch all game records
+    all_games = game.objects.all()
+
+    # Prepare HTML Table with styling
+    html_table = '''
+    <html>
+    <head>
+        <style>
+            table {
+                border-collapse: collapse;
+                width: 100%;
+            }
+            th {
+                background-color: #00897B;
+                color: white;
+                padding: 8px;
+            }
+            td {
+                background-color: #E0F7FA;
+                padding: 8px;
+            }
+        </style>
+    </head>
+    <body>
+        <table border="1">
+    '''
+
+    html_table += "<tr><th>User Name</th><th>Elo Rating</th><th>Uncertainty</th><th>Played</th><th>Won</th><th>Lost</th><th>Win%</th></tr>"
+
+    for game_instance in all_games:
+        user_name = game_instance.user_name
+        elo_rating = game_instance.elo_rating
+        uncertainty = game_instance.uncertainty
+        played = game_instance.played
+        won = game_instance.won
+        lost = game_instance.lost
+
+        # Calculate win% (win percentage)
+        win_percentage = 0  # Initialize to 0 to handle case when played is 0
+        if played != 0:
+            win_percentage = round((won / played) * 100, 1)
+
+        html_table += f"<tr><td>{user_name}</td><td>{elo_rating}</td><td>{uncertainty}</td><td>{played}</td><td>{won}</td><td>{lost}</td><td>{win_percentage}</td></tr>"
+
+    html_table += "</table></body></html>"
+
+    return HttpResponse(html_table)
+
+
+
+# Function to format the court name
+def format_court_name(court_key):
+    # Extract the last digit from the court key
+    court_number = court_key[-1]
+    # Create the new court name by attaching the extracted number
+    return f"Court-{court_number}"
+
+def callUpdateElo(response2):
+    teams = response2.get('teams', [])
+
+    # Assuming we're dealing with the first pairing
+    team1 = teams[0].get('team1', [])
+    team2 = teams[0].get('team2', [])
+
+    # Randomly pick a winner and loser
+    winner = random.choice(['team1', 'team2'])
+    loser = 'team2' if winner == 'team1' else 'team1'
+
+    # Create the payload
+    payload = {
+        "teamDetails":{
+        'winner': team1 if winner == 'team1' else team2,
+        'loser': team2 if loser == 'team2' else team1,
+        'court': format_court_name(response2.get('firstAvailableCourt'))  # Format the court name
+        }
+    }
+
+    # Step 3: Update ELO
+    response3 = requests.post('http://10.126.197.37:8000/app/updateElo/', json=payload)
+    if response3.status_code != 200:  # Note: check for status_code, as it's an HTTP response object
+        return JsonResponse({"error": "Failed to update ELO"}, status=400)
+
+
+

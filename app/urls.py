@@ -22,4 +22,5 @@ urlpatterns = [
 
     # Utility or admin related endpoints
     path('resetDatabase/', views.reset_database, name='resetDatabase'),
+    path('runSimulation/', views.run_simulation, name='runSimulation'),
 ]
