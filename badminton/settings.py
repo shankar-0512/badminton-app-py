@@ -29,7 +29,7 @@ SECRET_KEY = "django-insecure-xiq-l@ysy2&jy-s@c53yi6+@1nv@+(_(&vyqwqydd9sgt&s**7
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['10.126.197.37', 'localhost', '127.0.0.1', '192.168.0.98', 'badminton-app-py-c9deadd73cd5.herokuapp.com', "badminton-2-a5f023063bfd.herokuapp.com"]
+ALLOWED_HOSTS = ['10.126.197.37', 'localhost', '127.0.0.1', '192.168.0.98', 'badminton-app-py-c9deadd73cd5.herokuapp.com']
 
 
 

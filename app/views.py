@@ -593,9 +593,9 @@ def player_joined(sender, instance, **kwargs):
     active_players_count = game.objects.filter(status="active", playing="N").count()
     
     # Check if there is at least 1 court available
-    #available_court_count = court.objects.filter(status=True).count()
+    available_court_count = court.objects.filter(status=True).count()
     
-    if active_players_count >= 4:
+    if active_players_count >= 4 and available_court_count >= 1:
         generate_pairing()
 
 
