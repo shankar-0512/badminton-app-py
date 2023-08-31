@@ -647,94 +647,94 @@ def reset_database(request):
 
 #@api_view(['POST'])
 #def run_simulation(request):
-    game.objects.all().update(status='active')
+#    game.objects.all().update(status='active')
 
     # Loop 1000 times
-    for i in range(1000):
-        response2 = generate_pairing()  # Generate pairing
-        callUpdateElo(response2)  # Update ELO
+ #   for i in range(1000):
+ #       response2 = generate_pairing()  # Generate pairing
+ #       callUpdateElo(response2)  # Update ELO
 
     # Fetch all game records
-    all_games = game.objects.all()
+ #   all_games = game.objects.all()
 
     # Prepare HTML Table with styling
-    html_table = '''
-    <html>
-    <head>
-        <style>
-            table {
-                border-collapse: collapse;
-                width: 100%;
-            }
-            th {
-                background-color: #00897B;
-                color: white;
-                padding: 8px;
-            }
-            td {
-                background-color: #E0F7FA;
-                padding: 8px;
-            }
-        </style>
-    </head>
-    <body>
-        <table border="1">
-    '''
+ #   html_table = '''
+ #   <html>
+ #   <head>
+ #       <style>
+ #           table {
+ #               border-collapse: collapse;
+ #               width: 100%;
+ #           }
+ #           th {
+ #               background-color: #00897B;
+ #               color: white;
+ #               padding: 8px;
+ #           }
+ #           td {
+ #               background-color: #E0F7FA;
+ #               padding: 8px;
+ #           }
+ #       </style>
+ #   </head>
+ #   <body>
+ #       <table border="1">
+ #   '''
 
-    html_table += "<tr><th>User Name</th><th>Elo Rating</th><th>Uncertainty</th><th>Played</th><th>Won</th><th>Lost</th><th>Win%</th></tr>"
+ #   html_table += "<tr><th>User Name</th><th>Elo Rating</th><th>Uncertainty</th><th>Played</th><th>Won</th><th>Lost</th><th>Win%</th></tr>"
 
-    for game_instance in all_games:
-        user_name = game_instance.user_name
-        elo_rating = game_instance.elo_rating
-        uncertainty = game_instance.uncertainty
-        played = game_instance.played
-        won = game_instance.won
-        lost = game_instance.lost
+ #   for game_instance in all_games:
+ #       user_name = game_instance.user_name
+ #       elo_rating = game_instance.elo_rating
+ #       uncertainty = game_instance.uncertainty
+ #       played = game_instance.played
+ #       won = game_instance.won
+ #       lost = game_instance.lost
 
         # Calculate win% (win percentage)
-        win_percentage = 0  # Initialize to 0 to handle case when played is 0
-        if played != 0:
-            win_percentage = round((won / played) * 100, 1)
+ #       win_percentage = 0  # Initialize to 0 to handle case when played is 0
+ #       if played != 0:
+ #           win_percentage = round((won / played) * 100, 1)
 
-        html_table += f"<tr><td>{user_name}</td><td>{elo_rating}</td><td>{uncertainty}</td><td>{played}</td><td>{won}</td><td>{lost}</td><td>{win_percentage}</td></tr>"
+ #       html_table += f"<tr><td>{user_name}</td><td>{elo_rating}</td><td>{uncertainty}</td><td>{played}</td><td>{won}</td><td>{lost}</td><td>{win_percentage}</td></tr>"
 
-    html_table += "</table></body></html>"
+ #   html_table += "</table></body></html>"
 
-    return HttpResponse(html_table)
+#    return HttpResponse(html_table)
 
 
 
 # Function to format the court name
 #def format_court_name(court_key):
     # Extract the last digit from the court key
-    court_number = court_key[-1]
+#    court_number = court_key[-1]
     # Create the new court name by attaching the extracted number
-    return f"Court-{court_number}"
+#    return f"Court-{court_number}"
 
 #def callUpdateElo(response2):
-    teams = response2.get('teams', [])
+#    teams = response2.get('teams', [])
 
     # Assuming we're dealing with the first pairing
-    team1 = teams[0].get('team1', [])
-    team2 = teams[0].get('team2', [])
+ #   team1 = teams[0].get('team1', [])
+  #  team2 = teams[0].get('team2', [])
 
     # Randomly pick a winner and loser
-    winner = random.choice(['team1', 'team2'])
-    loser = 'team2' if winner == 'team1' else 'team1'
+#    winner = random.choice(['team1', 'team2'])
+#    loser = 'team2' if winner == 'team1' else 'team1'
 
     # Create the payload
-    payload = {
-        "teamDetails":{
-        'winner': team1 if winner == 'team1' else team2,
-        'loser': team2 if loser == 'team2' else team1,
-        'court': format_court_name(response2.get('firstAvailableCourt'))  # Format the court name
-        }
-    }
+#    payload = {
+#        "teamDetails":{
+#        'winner': team1 if winner == 'team1' else team2,
+#        'loser': team2 if loser == 'team2' else team1,
+#        'court': format_court_name(response2.get('firstAvailableCourt'))  # Format the court name
+#        }
+#    }
 
     # Step 3: Update ELO
-    response3 = requests.post('http://10.126.197.37:8000/app/updateElo/', json=payload)
-    if response3.status_code != 200:  # Note: check for status_code, as it's an HTTP response object
-        return JsonResponse({"error": "Failed to update ELO"}, status=400)
+ #   response3 = requests.post('http://10.126.197.37:8000/app/updateElo/', json=payload)
+ #   if response3.status_code != 200:  # Note: check for status_code, as it's an HTTP response object
+ #       return JsonResponse({"error": "Failed to update ELO"}, status=400)
 
 
 
