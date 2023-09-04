@@ -33,7 +33,7 @@ class APITestCase(TestCase):
         }
 
         response = self.client.post('/app/login/', json.dumps(data), content_type="application/json")
-        self.assertEqual(response.status_code, 200) # This might be 401 based on your API, adjust accordingly.
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['responseCode'], 1)
 
     def test_signup_valid_data(self):
@@ -55,7 +55,7 @@ class APITestCase(TestCase):
         }
 
         response = self.client.post('/app/signup/', json.dumps(data), content_type="application/json")
-        self.assertEqual(response.status_code, 200) # This might be 409 based on your API, adjust accordingly.
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['responseCode'], 1)
 
     def test_signup_short_password(self):
@@ -84,14 +84,14 @@ class APITestCase(TestCase):
         data = "This is not a valid json string."
 
         response = self.client.post('/app/login/', data, content_type="application/json")
-        self.assertEqual(response.status_code, 200) # This might be 400 based on your API, adjust accordingly.
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['responseCode'], 5)
 
     def test_signup_invalid_request(self):
         data = "This is not a valid json string."
 
         response = self.client.post('/app/signup/', data, content_type="application/json")
-        self.assertEqual(response.status_code, 200) # This might be 400 based on your API, adjust accordingly.
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['responseCode'], 5)
 
 
@@ -203,7 +203,6 @@ class PlayerDataTestCase(TestCase):
 class UpdateEloTestCase(TestCase):
     
     def setUp(self):
-        # Initialize some test players and courts here
         game.objects.create(user_name='player1', elo_rating=1000)
         game.objects.create(user_name='player2', elo_rating=1000)
         game.objects.create(user_name='player3', elo_rating=1000)
@@ -275,7 +274,6 @@ class UpdateEloTestCase(TestCase):
 class GeneratePairingTestCase(TestCase):
     
     def setUp(self):
-        # Initialize some test players and courts here
         game.objects.create(user_name='player1', elo_rating=1000, status="active", playing="N")
         game.objects.create(user_name='player2', elo_rating=1000, status="active", playing="N")
         game.objects.create(user_name='player3', elo_rating=1000, status="active", playing="N")
