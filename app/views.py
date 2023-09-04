@@ -374,33 +374,41 @@ def select_player(sorted_players, team):
 def generate_pairing():
     try:
         available_players = game.objects.filter(status="active", playing="N")
-        
+
         if len(available_players) < 4:
             return {
                 "responseCode": 1,
                 "responseMessage": "Not enough players for matches."
             }
 
-        sorted_players = sorted(available_players, key=lambda p: (-p.unmatched_priority, -p.uncertainty, p.elo_rating))
-        
+        sorted_players = sorted(available_players, key=lambda p: (-p.unmatched_priority))
+
         pairings, selected_players = [], []
         for _ in range(1):  
-            team1, team2 = [], []
-            for _ in range(2):
-                player = select_player(sorted_players, team1)
-                team1.append(player)
-                sorted_players.remove(player)
-            for _ in range(2):
-                player = select_player(sorted_players, team2)
-                team2.append(player)
-                sorted_players.remove(player)
-            
-            pairings.append((team1, team2))
-            selected_players.extend(team1 + team2)
-        # Updating players' status and history in DB
-        game.objects.filter(pk__in=[player.pk for player in selected_players]).update(playing="Y", unmatched_priority=0)
+            all_four_players = []
+            teams = [[], []]  # Initialize teams as empty lists
+
+            for team in teams:
+                for _ in range(2):
+                    player = select_player(sorted_players, team)
+                    team.append(player)
+                    all_four_players.append(player)
+                    sorted_players.remove(player)
+
+            # Sort all selected players
+            all_four_players.sort(key=lambda p: (-p.uncertainty, -p.elo_rating))
+
+            min_diff_team1 = [all_four_players[0], all_four_players[3]]
+            min_diff_team2 = [all_four_players[1], all_four_players[2]]
+
+            pairings.append((min_diff_team1, min_diff_team2))
+            selected_players.extend(min_diff_team1 + min_diff_team2)
+
+        # Update player statuses and unmatched_priority in the database
+        pks_of_selected_players = [player.pk for player in selected_players]
+        game.objects.filter(pk__in=pks_of_selected_players).update(playing="Y", unmatched_priority=0)
         game.objects.filter(pk__in=[player.pk for player in sorted_players]).update(unmatched_priority=F('unmatched_priority') + 1)
-        
+
         today = date.today()
         for team in pairings:
             for player1 in team[0]:
@@ -416,10 +424,8 @@ def generate_pairing():
         # Formatting teams
         teams = [
             {
-                'team1': [{'userName': player.user_name, 'elo': player.elo_rating, 'uncertainty': player.uncertainty}
-                          for player in team[0]],
-                'team2': [{'userName': player.user_name, 'elo': player.elo_rating, 'uncertainty': player.uncertainty}
-                          for player in team[1]]
+                'team1': [{'userName': player.user_name, 'elo': player.elo_rating, 'uncertainty': player.uncertainty} for player in team[0]],
+                'team2': [{'userName': player.user_name, 'elo': player.elo_rating, 'uncertainty': player.uncertainty} for player in team[1]]
             }
             for team in pairings
         ]
