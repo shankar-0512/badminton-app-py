@@ -128,7 +128,6 @@ def signup(request):
         new_user = game(
             user_name=username,
             password=hashed_password,
-            # You can add any additional fields here that are required for the new user
         )
         new_user.save()
 
@@ -288,7 +287,6 @@ def fetch_active_players(request):
                 'type': 'send_update',
                 'message': {
                     'updateType': 'active_players',
-                    # This can be the updated list of active players or a count
                     'data': active_players_count
                 }
             }
@@ -298,7 +296,7 @@ def fetch_active_players(request):
         return JsonResponse({
             "responseCode": 0,
             "responseMessage": "Active players fetched successfully.",
-            "activePlayersCount": active_players_count  # Include the count in the response
+            "activePlayersCount": active_players_count 
         })
 
     except Exception as e:
@@ -615,7 +613,7 @@ def reset_database(request):
 
         # Loop through available players and reset their attributes to default values
         for player in all_players:
-            player.elo_rating = 1500  # Assuming default ELO rating is 1500
+            player.elo_rating = 1500
             player.playing = 'N'
             player.status = "inactive"
             player.played = 0
@@ -625,7 +623,6 @@ def reset_database(request):
             player.last_played = ""
             player.rating_changes = ""
             player.unmatched_priority = 0
-            # Reset any other attributes as needed
             player.save()
 
         for court_status in all_courts:
@@ -639,11 +636,10 @@ def reset_database(request):
         return JsonResponse(response_data, safe=False)
 
     except Exception as e:
-        # Handle any exceptions that may occur during fetching active players
         print("Error:", e)
         return JsonResponse({"responseCode": 2, "responseMessage": "Reset Error"})
 
-######################################################## TESTING ########################################################
+#TESTING AND SIMULATION (COMMENTED THE BELOW LINES AS IT MIGHT CAUSE DISRUPTION TO THE ABOVE APIs) TO RUN IT, COMMENT THE "PLAYER_JOINED" FUNCTION AND CALL "RUN_SIMULATION" ########################################################
 
 #from django.http import JsonResponse
 #from rest_framework.decorators import api_view

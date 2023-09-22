@@ -1,6 +1,6 @@
 from django.test import TestCase, Client
 from django.contrib.auth.hashers import make_password
-from .models import game, court  # assuming the model is in the same app
+from .models import game, court
 import json
 from app.views import generate_pairing
 from django.db.models.signals import post_save

@@ -42,7 +42,7 @@ class history(models.Model):
     date = models.DateField(auto_now_add=True)
 
     class Meta:
-        pass  # If not using any constraints or options, consider removing the whole Meta class
+        pass 
 
     def __str__(self):
         return f"Matchup between {self.player1} and {self.player2} on {self.date}"
